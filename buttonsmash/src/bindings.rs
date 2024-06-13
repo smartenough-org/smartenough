@@ -11,24 +11,6 @@ pub enum Action {
     Noop,
 }
 
-/// Buttons can be triggered in multiple ways.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum Trigger {
-    /// Short click activation; longer than debounce period, but shorter than a
-    /// long click. Triggered on deactivation.
-    ShortClick,
-    /// Longer than a short click. Triggered on deactivation.
-    LongClick,
-    /// Triggered right after debouncing period is over.
-    Activated,
-    /// Triggered immediately on deactivation, no matter time.
-    Deactivated,
-    /// Activation that exceeds the shortclick time. A bit delayed.
-    LongActivated,
-    /// Deactivation after LongActivated was triggered
-    LongDeactivated,
-}
-
 /// Mapping from (button (input), trigger, layer) into action.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Binding {
@@ -79,12 +61,18 @@ pub struct BindingList<const N: usize> {
     added: usize,
 }
 
-impl<const N: usize> BindingList<N> {
-    pub fn new() -> Self {
+impl<const N: usize> Default for BindingList<N> {
+    fn default() -> Self {
         Self {
             bindings: [Binding::default(); N],
             added: 0,
         }
+    }
+}
+
+impl<const N: usize> BindingList<N> {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Clear defined bindings
@@ -103,7 +91,7 @@ impl<const N: usize> BindingList<N> {
                 if self.bindings[idx - 1].idx != input_idx {
                     break;
                 }
-                idx = idx - 1;
+                idx -= 1;
             }
             Some(idx)
         } else {
@@ -227,6 +215,5 @@ mod tests {
 
         blst.clear();
         assert_eq!(blst.added, 0);
-
     }
 }

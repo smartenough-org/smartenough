@@ -118,7 +118,8 @@ async fn main_event_handler(mut channel: mpsc::Receiver<Event>, outputs: Arc<Out
         Opcode::Stop,
     ];
 
-    let mut executor: Executor<30> = Executor::new();
+    let (event_sender, _event_receiver) = mpsc::channel(32);
+    let mut executor: Executor<30> = Executor::new(event_sender.clone());
     executor.load_static(&PROGRAM);
 
     loop {
@@ -129,91 +130,66 @@ async fn main_event_handler(mut channel: mpsc::Receiver<Event>, outputs: Arc<Out
 
 #[tokio::main]
 async fn main() {
-    panic!();
-
-    let output = Arc::new(OutputMock::new());
+    let _output = Arc::new(OutputMock::new());
+    println!("Main starts!");
+    /*
     let (event_sender, event_receiver) = mpsc::channel(32);
     let out = output.clone();
     let handler = tokio::spawn(main_event_handler(event_receiver, out));
 
-    println!("Main starts!");
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
     loop {
-        /* Click 1 */
+        // Click 1
         event_sender
-            .send(Event::ButtonEvent(SwitchEvent {
-                switch_id: 1,
-                state: SwitchState::Activated,
-            }))
+            .send(Event::new_button_trigger(1, Trigger::Activated))
             .await
             .unwrap();
 
         tokio::time::sleep(tokio::time::Duration::from_millis(30)).await;
 
         event_sender
-            .send(Event::ButtonEvent(SwitchEvent {
-                switch_id: 1,
-                state: SwitchState::Deactivated(30),
-            }))
+            .send(Event::new_button_trigger(1, Trigger::Deactivated))
             .await
             .unwrap();
 
         /* Press 2 long */
         event_sender
-            .send(Event::ButtonEvent(SwitchEvent {
-                switch_id: 1,
-                state: SwitchState::Activated,
-            }))
+            .send(Event::new_button_trigger(1, Trigger::Activated))
             .await
             .unwrap();
 
         tokio::time::sleep(tokio::time::Duration::from_millis(30)).await;
 
         event_sender
-            .send(Event::ButtonEvent(SwitchEvent {
-                switch_id: 1,
-                state: SwitchState::Active(30),
-            }))
+            .send(Event::new_button_trigger(1, Trigger::Activated))
             .await
             .unwrap();
 
         tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
 
-        /* Press 1 again */
+        // Press 1 again
         event_sender
-            .send(Event::ButtonEvent(SwitchEvent {
-                switch_id: 1,
-                state: SwitchState::Activated,
-            }))
+            .send(Event::new_button_trigger(1, Trigger::Activated))
             .await
             .unwrap();
 
         tokio::time::sleep(tokio::time::Duration::from_millis(30)).await;
 
         event_sender
-            .send(Event::ButtonEvent(SwitchEvent {
-                switch_id: 1,
-                state: SwitchState::Deactivated(30),
-            }))
+            .send(Event::new_button_trigger(1, Trigger::Deactivated))
             .await
             .unwrap();
 
         event_sender
-            .send(Event::ButtonEvent(SwitchEvent {
-                switch_id: 1,
-                state: SwitchState::Active(60),
-            }))
+            .send(Event::new_button_trigger(1, Trigger::Activated))
             .await
             .unwrap();
 
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
         event_sender
-            .send(Event::ButtonEvent(SwitchEvent {
-                switch_id: 1,
-                state: SwitchState::Deactivated(30),
-            }))
+            .send(Event::new_button_trigger(1, Trigger::Deactivated))
             .await
             .unwrap();
 
@@ -224,4 +200,5 @@ async fn main() {
     }
 
     handler.await.unwrap();
+    */
 }
