@@ -32,6 +32,33 @@ pub enum Command {
     Noop,
 }
 
+/// Buttons can be triggered in multiple ways.
+/// TODO: This is after initial detection of short/long click detection. Events can be duplicated for a key:
+/// eg. Activated -> LongActivated -> LongClick -> LongDeactivated -> Deactivated.
+/// Activated -> ShortClick -> Deactivated
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum Trigger {
+    /// Short click activation; longer than debounce period, but shorter than a
+    /// long click. Triggered on deactivation.
+    ShortClick,
+    /// Longer than a short click. Triggered on deactivation.
+    LongClick,
+    /// Triggered right after debouncing period is over.
+    Activated,
+    /// Triggered immediately on deactivation, no matter time.
+    Deactivated,
+    /// Activation that exceeds the shortclick time. A bit delayed.
+    LongActivated,
+    /// Deactivation after LongActivated was triggered
+    LongDeactivated,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct ButtonTrigger {
+    pub in_idx: InIdx,
+    pub trigger: Trigger,
+}
+
 #[derive(Debug, Copy, Clone)]
 pub enum SwitchState {
     /// Just pressed
@@ -57,9 +84,18 @@ pub enum LayerEvent {
 #[derive(Debug)]
 pub enum Event {
     /// Button event
-    ButtonEvent(SwitchEvent),
+    ButtonTrigger(ButtonTrigger),
     /*
     /// External information about layer change
     LayerEvent(LayerEvent),
     */
+}
+
+impl Event {
+    pub fn new_button_trigger(in_idx: InIdx, trigger: Trigger) -> Self {
+        Event::ButtonTrigger(ButtonTrigger {
+            in_idx,
+            trigger
+        })
+    }
 }
