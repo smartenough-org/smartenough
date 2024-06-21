@@ -21,6 +21,9 @@ pub enum Opcode {
 
     /// Enable a layer (later: push layer onto a layer stack)
     LayerPush(LayerIdx),
+    LayerPop,
+    /// Set layer and clear any previously set layer stack.
+    LayerSet(LayerIdx),
     /// Clear the layer stack - back to default layer.
     LayerDefault,
 
