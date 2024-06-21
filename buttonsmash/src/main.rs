@@ -53,14 +53,6 @@
  * - toggling a scene needs information about its state or "if at least one of
  *   its lights is enabled assume the scene is on".
  */
-use std::sync::Arc;
-use tokio::sync::{mpsc, Mutex};
-
-use buttonsmash::{
-    consts::*,
-    opcodes::Opcode,
-    microvm::*
-};
 
 /*
  * Layers in a distributed system.
@@ -75,130 +67,7 @@ use buttonsmash::{
  *
  */
 
-struct OutputMock {
-    pub commands: Mutex<Vec<Command>>,
-}
-
-impl OutputMock {
-    pub fn new() -> Self {
-        OutputMock {
-            commands: Mutex::new(Vec::new()),
-        }
-    }
-
-    pub async fn set(&self, command: Command) {
-        self.commands.lock().await.push(command);
-    }
-
-    pub async fn clear(&self) {
-        self.commands.lock().await.clear();
-    }
-}
-
-async fn main_event_handler(mut channel: mpsc::Receiver<Event>, outputs: Arc<OutputMock>) {
-    const PROGRAM: [Opcode; 16] = [
-        // Setup proc.
-        Opcode::Start(0),
-        Opcode::LayerDefault,
-        Opcode::BindShortToggle(1, 1),
-        Opcode::BindShortToggle(2, 2),
-        Opcode::BindShortToggle(3, 3),
-        Opcode::BindShortToggle(4, 4),
-        Opcode::BindShortToggle(5, 5),
-        Opcode::BindShortToggle(6, 6),
-        Opcode::BindShortToggle(7, 7),
-        Opcode::BindShortToggle(8, 8),
-        Opcode::BindShortToggle(9, 9),
-        Opcode::BindShortToggle(10, 10),
-        Opcode::Stop,
-
-        // Random proc.
-        Opcode::Start(1),
-        Opcode::Toggle(1),
-        Opcode::Stop,
-    ];
-
-    let (event_sender, _event_receiver) = mpsc::channel(32);
-    let mut executor: Executor<30> = Executor::new(event_sender.clone());
-    executor.load_static(&PROGRAM);
-
-    loop {
-        let event = channel.recv().await;
-        println!("Got event {:?}", event);
-    }
-}
-
 #[tokio::main]
 async fn main() {
-    let _output = Arc::new(OutputMock::new());
     println!("Main starts!");
-    /*
-    let (event_sender, event_receiver) = mpsc::channel(32);
-    let out = output.clone();
-    let handler = tokio::spawn(main_event_handler(event_receiver, out));
-
-    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-
-    loop {
-        // Click 1
-        event_sender
-            .send(Event::new_button_trigger(1, Trigger::Activated))
-            .await
-            .unwrap();
-
-        tokio::time::sleep(tokio::time::Duration::from_millis(30)).await;
-
-        event_sender
-            .send(Event::new_button_trigger(1, Trigger::Deactivated))
-            .await
-            .unwrap();
-
-        /* Press 2 long */
-        event_sender
-            .send(Event::new_button_trigger(1, Trigger::Activated))
-            .await
-            .unwrap();
-
-        tokio::time::sleep(tokio::time::Duration::from_millis(30)).await;
-
-        event_sender
-            .send(Event::new_button_trigger(1, Trigger::Activated))
-            .await
-            .unwrap();
-
-        tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
-
-        // Press 1 again
-        event_sender
-            .send(Event::new_button_trigger(1, Trigger::Activated))
-            .await
-            .unwrap();
-
-        tokio::time::sleep(tokio::time::Duration::from_millis(30)).await;
-
-        event_sender
-            .send(Event::new_button_trigger(1, Trigger::Deactivated))
-            .await
-            .unwrap();
-
-        event_sender
-            .send(Event::new_button_trigger(1, Trigger::Activated))
-            .await
-            .unwrap();
-
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-
-        event_sender
-            .send(Event::new_button_trigger(1, Trigger::Deactivated))
-            .await
-            .unwrap();
-
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-
-        println!("Main waits for next cycle");
-        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-    }
-
-    handler.await.unwrap();
-    */
 }

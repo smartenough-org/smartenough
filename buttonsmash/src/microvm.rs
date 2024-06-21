@@ -1,13 +1,15 @@
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::mpsc;
 
 use crate::bindings::*;
 use crate::consts::*;
+use crate::layers::Layers;
 use crate::opcodes::Opcode;
 
 /// Executes actions using a program.
 pub struct Executor<const BINDINGS: usize> {
     /// Current selected Layer
-    current_layer: LayerIdx,
+    // current_layer: LayerIdx,
+    layers: Layers,
     bindings: BindingList<BINDINGS>,
     opcodes: [Opcode; 1024],
     procedures: [usize; MAX_PROCEDURES],
@@ -18,7 +20,7 @@ pub struct Executor<const BINDINGS: usize> {
 impl<const BN: usize> Executor<BN> {
     pub fn new(queue: mpsc::Sender<Command>) -> Self {
         Self {
-            current_layer: 0,
+            layers: Layers::new(),
             bindings: BindingList::new(),
             opcodes: [Opcode::Noop; 1024],
             procedures: [0; MAX_PROCEDURES],
@@ -33,6 +35,8 @@ impl<const BN: usize> Executor<BN> {
         }
         self.index_code();
         self.execute(0).await;
+        // Finish on default layer
+        self.layers.reset();
     }
 
     pub async fn emit(&self, command: Command) {
@@ -46,7 +50,7 @@ impl<const BN: usize> Executor<BN> {
         self.bindings.bind(Binding {
             idx,
             trigger,
-            layer: self.current_layer,
+            layer: self.layers.current,
             action: Action::Proc(proc_idx),
         });
     }
@@ -56,7 +60,7 @@ impl<const BN: usize> Executor<BN> {
         self.bindings.bind(Binding {
             idx,
             trigger,
-            layer: self.current_layer,
+            layer: self.layers.current,
             action: Action::Single(command),
         });
     }
@@ -88,14 +92,22 @@ impl<const BN: usize> Executor<BN> {
             // Enable a layer (TODO: push layer onto a layer stack?)
             Opcode::LayerPush(layer) => {
                 assert!(layer as usize <= MAX_LAYERS);
-                self.current_layer = layer;
+                // Use a `virtual` input idx of 0 when forcing a layer activation.
+                self.layers.activate(0, layer);
             }
-            // Clear the layer stack - back to default layer.
-            Opcode::LayerDefault => {
-                self.current_layer = 0;
+            Opcode::LayerPop => {
+                // Deactivate last virtual 0 input.
+                self.layers.maybe_deactivate(0);
+            }
+            Opcode::LayerSet(layer) => {
+                self.layers.reset();
+                self.layers.activate(0, layer);
             }
 
-            // TODO: Opcode::LayerPop?
+            // Clear the layer stack - back to default layer.
+            Opcode::LayerDefault => {
+                self.layers.reset();
+            }
 
             // WaitForRelease - maybe?
             // Procedure 0 is executed after loading and it can map the actions initially
@@ -137,18 +149,16 @@ impl<const BN: usize> Executor<BN> {
             }
 
             Opcode::BindLayerHold(in_idx, layer_idx) => {
-                // When this is in use + ShortClick means something, then
-                // the shortclick should be defined on that layer.
+                // When this is in use + ShortClick is defined for the same key,
+                // then the shortclick should be defined on new layer.
                 self.bind_single(
                     in_idx,
                     Trigger::Activated,
                     Command::ActivateLayer(layer_idx),
                 );
-                self.bind_single(
-                    in_idx,
-                    Trigger::Deactivated,
-                    Command::DeactivateLayer(layer_idx),
-                );
+
+                // NOTE: Layer deactivation is handled automatically and should
+                // not be bound.
             } // Hypothetical?
               // Read input value (local) into register
               /*
@@ -194,23 +204,41 @@ impl<const BN: usize> Executor<BN> {
     pub async fn parse_event(&mut self, event: &Event) {
         match event {
             Event::ButtonTrigger(data) => {
-                let binding =
-                    self.bindings
-                        .filter(data.in_idx, Some(self.current_layer), Some(data.trigger));
+                if data.trigger == Trigger::Deactivated && self.layers.maybe_deactivate(data.in_idx)
+                {
+                    // Deactivated layer that was previously activated using
+                    // this key. TODO: Warning! Event order might be important.
+                    // longclick, longdeactivate first, then deactivate?
+                    return;
+                }
+
+                let binding = self.bindings.filter(
+                    data.in_idx,
+                    Some(self.layers.current),
+                    Some(data.trigger),
+                );
                 if let Some(binding) = binding {
                     println!("Found matching event {:?}", binding.action);
 
                     match binding.action {
                         Action::Noop => {}
-                        Action::Single(cmd) => {
-                            self.emit(cmd).await;
-                        }
+                        Action::Single(cmd) => match cmd {
+                            Command::ActivateLayer(layer) => {
+                                self.layers.activate(data.in_idx, layer);
+                                // self.current_layer = layer
+                            }
+                            Command::DeactivateLayer(layer) => {
+                                todo!("deactivation is based on stack list");
+                                // self.current_layer = 0
+                            }
+                            _ => self.emit(cmd).await,
+                        },
                         Action::Proc(proc_idx) => {
                             self.execute(proc_idx).await;
                         }
                     }
                 } else {
-                    println!("Not found binding!");
+                    println!("Not found binding {:?}!", data);
                 }
             }
         }
@@ -220,9 +248,10 @@ impl<const BN: usize> Executor<BN> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[tokio::test]
-    async fn it_handles_basic_code() {
-        const PROGRAM: [Opcode; 13] = [
+
+
+    async fn get_prepared() -> (Executor<30>, mpsc::Receiver<Command>) {
+        const PROGRAM: [Opcode; 16] = [
             // Setup proc.
             Opcode::Start(0),
             Opcode::LayerDefault,
@@ -231,6 +260,9 @@ mod tests {
             Opcode::BindLongToggle(3, 20),
             Opcode::BindShortToggle(3, 21),
             Opcode::BindShortCall(4, 1),
+            Opcode::BindLayerHold(5, 66),
+            Opcode::LayerPush(66),
+            Opcode::BindShortToggle(1, 13),
             Opcode::Stop,
             // Test proc.
             Opcode::Start(1),
@@ -240,9 +272,18 @@ mod tests {
             Opcode::Stop,
         ];
 
-        let (event_src, mut event_handler) = mpsc::channel(32);
+        let (event_src, event_handler) = mpsc::channel(32);
         let mut executor: Executor<30> = Executor::new(event_src);
         executor.load_static(&PROGRAM).await;
+
+        (executor, event_handler)
+    }
+
+
+    #[tokio::test]
+    async fn it_handles_basic_code() {
+
+        let (mut executor, mut event_handler) = get_prepared().await;
 
         executor
             .parse_event(&Event::new_button_trigger(3, Trigger::LongClick))
@@ -255,6 +296,7 @@ mod tests {
         assert_eq!(cmd, Command::ToggleOutput(20));
         let cmd = event_handler.recv().await.unwrap();
         assert_eq!(cmd, Command::ToggleOutput(21));
+        assert!(event_handler.is_empty());
 
         // Try procedure execution
         executor
@@ -267,5 +309,50 @@ mod tests {
         assert_eq!(cmd, Command::ActivateOutput(101));
         let cmd = event_handler.recv().await.unwrap();
         assert_eq!(cmd, Command::DeactivateOutput(110));
+    }
+
+    #[tokio::test]
+    async fn it_handles_layers() {
+        let (mut executor, mut event_handler) = get_prepared().await;
+
+        // Try layer differentiator
+        assert!(event_handler.is_empty());
+
+        // Normal activation on layer 0 -> 10 output
+        executor
+            .parse_event(&Event::new_button_trigger(1, Trigger::ShortClick))
+            .await;
+        // Holds layer 66 active.
+        executor
+            .parse_event(&Event::new_button_trigger(5, Trigger::Activated))
+            .await;
+        // Now activates 13 instead.
+        executor
+            .parse_event(&Event::new_button_trigger(1, Trigger::ShortClick))
+            .await;
+        // ...twice.
+        executor
+            .parse_event(&Event::new_button_trigger(1, Trigger::ShortClick))
+            .await;
+        // Back to layer 1
+        executor
+            .parse_event(&Event::new_button_trigger(5, Trigger::Deactivated))
+            .await;
+        // Activates 10.
+        executor
+            .parse_event(&Event::new_button_trigger(1, Trigger::ShortClick))
+            .await;
+
+        let cmd = event_handler.recv().await.unwrap();
+        assert_eq!(cmd, Command::ToggleOutput(10));
+        let cmd = event_handler.recv().await.unwrap();
+        assert_eq!(cmd, Command::ToggleOutput(13));
+        let cmd = event_handler.recv().await.unwrap();
+        assert_eq!(cmd, Command::ToggleOutput(13));
+        let cmd = event_handler.recv().await.unwrap();
+        assert_eq!(cmd, Command::ToggleOutput(10));
+        assert!(event_handler.is_empty());
+
+        // TODO: Multiple layers test.
     }
 }
