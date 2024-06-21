@@ -1,0 +1,74 @@
+# Example smarthome automation VM code.
+
+livingroom:
+  # Map pluggable expanders to enumerated IOs
+  expanders:
+    - addr: "001"
+      direction: in
+      pins: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    - addr: "111"
+      direction: out
+      pins: [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
+
+  # Name local inputs (aliases)
+  inputs:
+    - kitchen1_r: 0
+    - kitchen1_l: 1
+    - kitchen2_r: 2
+    - kitchen2_l: 3
+
+  # Name local outputs
+  outputs:
+    - main_kitchen: 0
+    - island: 1
+    - dining_main: 1
+    - dining_table: 1
+    - dining_wall: 1
+    - living_main: 1
+    - living_wall_piano: 1
+    - living_wall_painting: 1
+
+  # Or maybe:
+  bindings:
+    - input: kitchen1_r
+      # layer: 0  # Optional, default 0.
+      short:
+        toggle: main_kitchen
+        # Or a list, that will generate a procedure:
+        # toggle: [main_kitchen, island]
+        # activate: ...
+        # deactivate: ...
+        # long_activate: ...
+        # long_deactivate: ...
+        # call: ...
+    - input: kitchen2_r
+      short:
+        toggle: island
+    - input: kitchen1_r
+      layer: 1
+      short:
+        toggle: main_kitchen
+        # toggle: [main_kitchen, island]
+
+    - input: kitchen1_r
+      long:
+        # all-off can be remotely called so it's a named procedure.
+        call: all-off
+
+
+  # Procedures-first approach: (?)
+  procedures:
+    all-off:
+      deactivate: [kitchen1_l, kitchen1_r, ...]
+      # opcodes:
+      #   Direct opcodes?
+
+
+fusebox:
+  procedures:
+    main:
+      id: 0
+      opcodes:
+        - LayerDefault
+        - BindShortToggle: [1, 1]
+        - BindShortToggle: [2, 1]
