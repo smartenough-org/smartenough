@@ -1,0 +1,11 @@
+[package]
+name = "io-gate"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1", features = ["rt", "macros", "rt-multi-thread", "io-util", "time"] }
+tokio-serial = "5.4"
+clap = { version = "4.5", features = ["derive"] }
+clap_derive = { version = "4.5" }
+anyhow = { version = "1" }
