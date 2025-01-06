@@ -105,7 +105,7 @@ impl Initiator {
                     }
                     Outgoing::DiscoveryDevice(msg) => {
                         let topic = format!(
-                            "{}/device/io-gate-{}/config",
+                            "{}/device/{}/config",
                             consts::HA_DISCOVERY_TOPIC,
                             msg.device.identifiers[0]
                         );

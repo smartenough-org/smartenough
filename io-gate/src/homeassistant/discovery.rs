@@ -1,3 +1,4 @@
+use crate::config;
 use serde::Serialize;
 use serde_json;
 use std::collections::HashMap;
@@ -64,7 +65,7 @@ impl Discovery {
     }
 }
 
-pub fn new_device(name: &str, device_addr: u8, outputs: u8) -> Discovery {
+pub fn new_device(name: &str, config: &config::DeviceConfig) -> Discovery {
     let origin = Origin {
         name: crate::consts::GATE_NAME.to_string(),
         sw_version: crate::consts::GATE_VERSION.to_string(),
@@ -73,15 +74,19 @@ pub fn new_device(name: &str, device_addr: u8, outputs: u8) -> Discovery {
 
     let device_id = DeviceId {
         name: name.to_string(),
-        identifiers: vec![format!("gate-{}", device_addr)],
+        identifiers: vec![format!("gate-{}", config.addr)],
         manufacturer: "smartenough".to_string(),
     };
 
     let mut components = HashMap::new();
 
-    for i in 0..outputs {
-        let name = format!("dev-{}-{}", device_addr, i);
-        let component = Component::new_switch(&name, device_addr, i);
+    for i in 0..config.outputs.count {
+        let name = if let Some(label) = config.outputs.labels.get(i as usize) {
+            label.to_string()
+        } else {
+            format!("{}-{}", name, i)
+        };
+        let component = Component::new_switch(&name, config.addr, i);
 
         components.insert(name, component);
     }

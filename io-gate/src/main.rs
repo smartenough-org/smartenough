@@ -56,7 +56,7 @@ fn init_log() {
 /// Perform initial configuration and device discovery.
 async fn init_config(config: &Config, ha: &HomeAssistant) -> anyhow::Result<()> {
     for (device_name, cfg) in &config.devices {
-        let message = discovery::new_device(&device_name, cfg.addr, cfg.outputs.count);
+        let message = discovery::new_device(&device_name, &cfg);
         ha.send(homeassistant::Outgoing::DiscoveryDevice(message))
             .await?;
     }
