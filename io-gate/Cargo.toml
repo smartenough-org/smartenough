@@ -2,15 +2,24 @@
 name = "io-gate"
 version = "0.1.0"
 edition = "2021"
+homepage = "https://github.com/smartenough-org"
 
 [dependencies]
 tokio = { version = "1", features = ["rt", "macros", "rt-multi-thread", "io-util", "time", "sync"] }
 tokio-serial = "5.4"
+rumqttc = { version = "0.24.0" }
+
 clap = { version = "4.5", features = ["derive"] }
 clap_derive = { version = "4.5" }
 anyhow = { version = "1" }
-rumqttc = { version = "0.24.0" }
+
+# JSON for homeassistant
+serde = { version = "1", features= ["derive"] }
+serde_json = { version = "1" }
+# Yaml for configuration files
+serde_yaml = { version = "0.9" }
+
+# Logging
 tracing = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["chrono"] }
-# time = { version = "0.3" }
 chrono = { version = "0.4" }

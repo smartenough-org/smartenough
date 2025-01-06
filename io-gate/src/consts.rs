@@ -26,3 +26,10 @@ pub enum Trigger {
     /// Deactivation after LongActivated was triggered
     LongDeactivated,
 }
+
+/// Software version
+pub const GATE_VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const GATE_NAME: &str = "io-gate";
+pub const GATE_URL: &str = env!("CARGO_PKG_HOMEPAGE");
+
+pub const HA_DISCOVERY_TOPIC: &str = "homeassistant";

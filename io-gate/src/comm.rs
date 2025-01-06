@@ -1,4 +1,4 @@
-use crate::message::{Message, MessageRaw};
+use crate::message::MessageRaw;
 use tokio::io::{AsyncReadExt, AsyncWriteExt, ReadHalf, WriteHalf};
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
@@ -50,11 +50,13 @@ async fn reader(
         let body_len: usize = match buf[1] {
             SYNC_BYTE_2_CAN => {
                 if read_len < 2 + CAN_MESSAGE_LENGTH {
-                    println!("Invalid message length. Skipping chunk {:?}",
-                             &buf[0..read_len]);
+                    println!(
+                        "Invalid message length. Skipping chunk {:?}",
+                        &buf[0..read_len]
+                    );
                 }
                 CAN_MESSAGE_LENGTH
-            },
+            }
             _ => {
                 info!(
                     "Synchronization 2 failed - preambule error. Skipping chunk: {:?}",
@@ -63,8 +65,6 @@ async fn reader(
                 continue;
             }
         };
-
-        let body = &buf[PREAMBULE_LENGTH..PREAMBULE_LENGTH + body_len];
 
         if body_len + PREAMBULE_LENGTH > read_len {
             info!(
@@ -122,16 +122,12 @@ async fn writer(
         } else {
             return Ok(());
         }
-
     }
 }
 
 #[tracing::instrument]
-pub async fn run(
-    port_name: String,
-    baud_rate: u32,
-) -> anyhow::Result<Comm> {
-// -> anyhow::Result<(mpsc::Sender<MessageRaw>, mpsc::Receiver<MessageRaw>)> {
+pub async fn run(port_name: String, baud_rate: u32) -> anyhow::Result<Comm> {
+    // -> anyhow::Result<(mpsc::Sender<MessageRaw>, mpsc::Receiver<MessageRaw>)> {
     let builder = tokio_serial::new(port_name, baud_rate);
     let stream = tokio_serial::SerialStream::open(&builder)?;
     let (port_read, port_write) = tokio::io::split(stream);
@@ -152,6 +148,4 @@ pub async fn run(
     })
     // tokio::try_join!(reader, writer)?;
     //Ok((out_tx, in_rx))
-
-
 }
