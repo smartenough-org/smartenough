@@ -6,7 +6,13 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::{sync::Mutex, task};
 
-use tracing::{info, warn};
+use tracing::{info, warn, debug, error};
+
+pub struct Initiator {
+    client: AsyncClient,
+    event_loop: EventLoop,
+    base: String,
+}
 
 /// HA interfacing via MQTT
 pub struct HomeAssistant {
@@ -14,12 +20,6 @@ pub struct HomeAssistant {
     outgoing: mpsc::Sender<Outgoing>,
     /// Incoming event queue: commands read from HA.
     incoming: Mutex<mpsc::Receiver<Incoming>>,
-}
-
-pub struct Initiator {
-    client: AsyncClient,
-    event_loop: EventLoop,
-    base: String,
 }
 
 impl Initiator {
@@ -63,17 +63,53 @@ impl Initiator {
             let notification = event_loop.poll().await;
             let result = match notification {
                 Ok(Event::Incoming(Packet::Publish(msg))) => {
-                    info!("Payload: {:?}", msg.payload);
-                    info!("Received incoming-publish = {:?}", msg);
-                    queue.send(Incoming::RawTest(msg.payload.to_vec())).await
+                    // This can be ON/OFF messaging
+                    info!("RX message to {} with payload '{:?}'", msg.topic, msg.payload);
+                    let topic = &msg.topic;
+                    let parts: Vec<&str> = topic.split("/").collect();
+                    // Maybe regexp instead?
+                    if parts.len() == 5 && parts[0] == "smartenough" && parts[2] == "switch" && parts[4] == "set" {
+                        // This is a command setting output to particular value.
+                        let device = parts[1].parse::<u8>();
+                        if device.is_err() {
+                            warn!("Device address is not a 0-255 number: {}", parts[1]);
+                            continue;
+                        }
+                        let device = device.unwrap();
+
+                        let output= parts[3].parse::<u8>();
+                        if output.is_err() {
+                            warn!("Output index is not a 0-255 number: {}", parts[3]);
+                            continue;
+                        }
+                        let output = output.unwrap();
+                        let on = msg.payload == "ON";
+
+                        let message = Incoming::SetOutput {
+                            device,
+                            output,
+                            on,
+                        };
+                        queue.send(message).await
+                    } else {
+                        info!("Unknown topic - ignoring");
+                        continue;
+                    }
                 }
+                Ok(Event::Outgoing(_)) |
+                Ok(Event::Incoming(Packet::PingResp)) |
+                Ok(Event::Incoming(Packet::SubAck(_))) |
+                Ok(Event::Incoming(Packet::PubAck(_))) => {
+                    // Silence common messages
+                    continue;
+                },
                 _ => {
-                    info!("Received other = {:?}", notification);
+                    info!("Received other message = {:?}", notification);
                     continue;
                 }
             };
             if result.is_err() {
-                warn!(
+                error!(
                     "Error while sending received message to queue: {:?}. Quitting loop",
                     result
                 );
@@ -86,6 +122,15 @@ impl Initiator {
         loop {
             if let Some(command) = queue.recv().await {
                 match command {
+                    Outgoing::Subscribe(topic) => {
+                        let result = client
+                            .subscribe(&topic, QoS::AtMostOnce)
+                            .await;
+                        if result.is_err() {
+                            warn!("Unable to subscribe to a topic {}. Hard fail", topic);
+                            panic!("Unable to continue");
+                        }
+                    }
                     Outgoing::Initial => {
                         client
                             .publish(
@@ -98,10 +143,10 @@ impl Initiator {
                             .expect("Initial message should publish fine");
                     }
                     Outgoing::RawTest(raw) => {
-                        let result = client
+                        client
                             .publish("hello/rumqtt", QoS::AtLeastOnce, false, raw)
-                            .await;
-                        info!("Published and returned {:?}", result);
+                            .await
+                            .expect("Test should work");
                     }
                     Outgoing::DiscoveryDevice(msg) => {
                         let topic = format!(
@@ -109,12 +154,14 @@ impl Initiator {
                             consts::HA_DISCOVERY_TOPIC,
                             msg.device.identifiers[0]
                         );
-                        let payload = msg.to_string();
-                        info!("Sending discovery payload to {}: {}", topic, payload);
+                        let payload = msg.serialize();
+                        debug!("Sending discovery payload to {}: {}", topic, payload);
                         let result = client
                             .publish(topic, QoS::AtLeastOnce, false, payload)
                             .await;
-                        info!("Published and returned {:?}", result);
+                        if result.is_err() {
+                            error!("Unable to publish discovery message {:?}", result);
+                        }
                     }
                 }
             } else {
@@ -138,6 +185,8 @@ impl Initiator {
 }
 
 impl HomeAssistant {
+    /// Receive incoming message (from MQTT). None means the HA reading loop
+    /// finished.
     pub async fn recv(&self) -> Option<Incoming> {
         // Receive incoming messages.
         let mut incoming = self.incoming.lock().await;

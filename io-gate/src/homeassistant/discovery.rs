@@ -24,14 +24,15 @@ pub struct Origin {
 /// Represents a component - a part of Device defined by Discovery
 #[derive(Serialize, Debug)]
 pub struct Component {
-    name: String,
-    platform: String,
+    pub name: String,
+    pub platform: String,
     /// Changes icon; outlet or switch
-    device_class: String,
-    unique_id: String,
+    pub device_class: String,
+    // pub icon: String,
+    pub unique_id: String,
     /// smartenough/
-    command_topic: String,
-    state_topic: String,
+    pub command_topic: String,
+    pub state_topic: String,
 }
 
 impl Component {
@@ -40,6 +41,7 @@ impl Component {
             name: name.to_string(),
             platform: "switch".to_string(),
             device_class: "switch".to_string(),
+            // icon: "mdi:light".to_string(),
             unique_id: format!("io-gate-{}-{}", device_addr, idx),
             command_topic: format!("smartenough/{}/switch/{}/set", device_addr, idx),
             state_topic: format!("smartenough/{}/switch/{}/get", device_addr, idx),
@@ -60,7 +62,7 @@ pub struct Discovery {
 }
 
 impl Discovery {
-    pub fn to_string(&self) -> String {
+    pub fn serialize(&self) -> String {
         serde_json::to_string(self).expect("All should be serializable")
     }
 }

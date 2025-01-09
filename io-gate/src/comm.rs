@@ -2,8 +2,7 @@ use crate::message::MessageRaw;
 use tokio::io::{AsyncReadExt, AsyncWriteExt, ReadHalf, WriteHalf};
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
-use tokio::time::Duration;
-use tracing::info;
+use tracing::{debug, info};
 
 const PREAMBULE_LENGTH: usize = 2;
 const CAN_MESSAGE_LENGTH: usize = 3 + 8;
@@ -81,9 +80,9 @@ async fn reader(
         let msg_type = packet[1];
         let length = packet[2] as usize;
         let data = &packet[3..3 + length];
+        debug!("USB->RX: {} bytes: {:02x?}", body_len, packet);
 
         let raw = MessageRaw::from_bytes(addr, msg_type, data);
-        //handle_incoming(raw).await?;
         channel.send(raw).await?;
     }
 }
@@ -99,7 +98,7 @@ async fn writer(
             // TODO: Now it assumes CAN frames only.
 
             let (addr, msg_type) = msg.addr_type();
-            let total_size = PREAMBULE_LENGTH + CAN_MESSAGE_LENGTH as usize;
+            let total_size = PREAMBULE_LENGTH + CAN_MESSAGE_LENGTH;
 
             buf[0] = SYNC_BYTE_1;
             buf[1] = SYNC_BYTE_2_CAN;
@@ -110,10 +109,9 @@ async fn writer(
 
             let msg_buf = &buf[0..total_size];
 
-            tokio::time::sleep(Duration::from_secs(1)).await;
             match port.write(msg_buf).await {
                 Ok(size) => {
-                    info!("USB TX: {} bytes: {:02x?}", size, msg_buf);
+                    debug!("TX->USB: {} bytes: {:02x?}", size, msg_buf);
                 }
                 Err(err) => {
                     anyhow::bail!("Error while sending to port {:?}", err);

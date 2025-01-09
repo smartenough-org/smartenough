@@ -1,4 +1,6 @@
-// Message parsing parts moved from io-ctrl. TODO: Move to a shared crate.
+// Message parsing parts moved from io-ctrl. TODO: Maybe move to a shared crate.
+use anyhow::bail;
+
 use crate::consts::{InIdx, OutIdx, ProcIdx};
 
 /* Generic CAN has 11-bit addresses.
@@ -58,6 +60,7 @@ mod msg_type {
 }
 
 pub mod args {
+    pub use anyhow::bail;
     pub use crate::consts::Trigger;
 
     #[derive(Clone, Copy, Debug)]
@@ -86,15 +89,22 @@ pub mod args {
             self as u8
         }
 
-        pub fn from_u8(raw: u8) -> Result<Self, ()> {
+        pub fn from_u8(raw: u8) -> anyhow::Result<Self> {
             match raw {
                 0 => Ok(Self::Off),
                 1 => Ok(Self::On),
                 2 => Ok(Self::Toggle),
                 _ => {
-                    println!("OutputState parsed from invalid arg {}", raw);
-                    Err(())
+                    bail!("OutputState parsed from invalid arg {}", raw);
                 }
+            }
+        }
+
+        pub fn from_bool(on: bool) -> Self {
+            if on {
+                Self::On
+            } else {
+                Self::Off
             }
         }
     }
@@ -104,7 +114,7 @@ pub mod args {
             self as u8
         }
 
-        pub fn from_u8(raw: u8) -> Result<Self, ()> {
+        pub fn from_u8(raw: u8) -> anyhow::Result<Self> {
             match raw {
                 0 => Ok(Trigger::ShortClick),
                 1 => Ok(Trigger::LongClick),
@@ -112,7 +122,7 @@ pub mod args {
                 3 => Ok(Trigger::Deactivated),
                 4 => Ok(Trigger::LongActivated),
                 5 => Ok(Trigger::LongDeactivated),
-                _ => Err(()),
+                _ => bail!("Invalid raw value {}, unable to convert to trigger", raw),
             }
         }
     }
@@ -197,8 +207,8 @@ pub enum Message {
      */
 }
 
-/// Holds decoded message with additional metadata.
 /*
+/// Holds decoded message with additional metadata.
 Is it useful?
 pub struct Envelope {
     // 5 bits
@@ -272,80 +282,77 @@ impl MessageRaw {
 }
 
 impl Message {
-    pub fn from_raw(raw: MessageRaw) -> Result<Self, ()> {
+    pub fn from_raw(raw: MessageRaw) -> anyhow::Result<Self> {
         match raw.msg_type {
             msg_type::SET_OUTPUT => {
                 if raw.length != 2 {
-                    println!("Set output has invalid message length {:?}", raw);
-                    return Err(());
+                    bail!("Set output has invalid message length {:?}", raw);
+                } else {
+                    let state = args::OutputState::from_u8(raw.data[1])?;
+                    Ok(Message::SetOutput {
+                        output: raw.data[0],
+                        state,
+                    })
                 }
-
-                let state = args::OutputState::from_u8(raw.data[1])?;
-                Ok(Message::SetOutput {
-                    output: raw.data[0],
-                    state,
-                })
             }
             msg_type::TRIGGER_INPUT => {
                 if raw.length != 2 {
-                    println!("Trigger input has an invalid message length {:?}", raw);
-                    return Err(());
+                    bail!("Trigger input has an invalid message length {:?}", raw);
+                } else {
+                    let trigger = args::Trigger::from_u8(raw.data[1])?;
+                    Ok(Message::TriggerInput {
+                        input: raw.data[0],
+                        trigger,
+                    })
                 }
-
-                let trigger = args::Trigger::from_u8(raw.data[1])?;
-                Ok(Message::TriggerInput {
-                    input: raw.data[0],
-                    trigger,
-                })
             }
             msg_type::CALL_PROC => {
                 if raw.length != 1 {
-                    println!("Call proc has invalid message length {:?}", raw);
-                    return Err(());
+                    bail!("Call proc has invalid message length {:?}", raw);
+                } else {
+                    let proc_id: ProcIdx = raw.data[0];
+                    Ok(Message::CallProcedure { proc_id })
                 }
-                let proc_id: ProcIdx = raw.data[0];
-                Ok(Message::CallProcedure { proc_id })
             }
             msg_type::TIME_ANNOUNCEMENT => {
                 if raw.length != 2 + 1 + 1 + 1 + 1 + 1 + 1 {
-                    println!("Time announcement has invalid message length {:?}", raw);
-                    return Err(());
+                    bail!("Time announcement has invalid message length {:?}", raw);
+                } else {
+                    Ok(Message::TimeAnnouncement {
+                        year: u16::from_le_bytes([raw.data[0], raw.data[1]]),
+                        month: raw.data[2],
+                        day: raw.data[3],
+                        hour: raw.data[4],
+                        minute: raw.data[5],
+                        second: raw.data[6],
+                        day_of_week: raw.data[7],
+                    })
                 }
-                Ok(Message::TimeAnnouncement {
-                    year: u16::from_le_bytes([raw.data[0], raw.data[1]]),
-                    month: raw.data[2],
-                    day: raw.data[3],
-                    hour: raw.data[4],
-                    minute: raw.data[5],
-                    second: raw.data[6],
-                    day_of_week: raw.data[7],
-                })
             }
 
             msg_type::REQUEST_STATUS => Ok(Message::RequestStatus),
 
             msg_type::INFO | msg_type::ERROR | msg_type::STATUS => {
-                println!("Ignoring info/error/status message: {:?}", raw);
-                return Err(());
+                bail!("Ignoring info/error/status message: {:?}", raw);
             }
 
             msg_type::OUTPUT_CHANGED | msg_type::INPUT_TRIGGERED => {
-                println!("Ignoring output/input change message {:?}", raw);
-                return Err(());
+                bail!("Ignoring output/input change message {:?}", raw);
             }
 
             _ => {
                 // TBH, probably safe to ignore.
-                println!("Unable to parse unhandled message type {:?}", raw);
-                return Err(());
+                bail!("Unable to parse unhandled message type {:?}", raw);
             }
         }
     }
 
     /// Convert message to 11 bit address and up to 8 bytes of data to be sent via CAN.
     pub fn to_raw(&self, addr: u8) -> MessageRaw {
-        let mut raw = MessageRaw::default();
-        raw.addr = addr;
+        let mut raw = MessageRaw{
+            addr,
+            .. MessageRaw::default()
+        };
 
         match self {
             Message::Error { code } => {

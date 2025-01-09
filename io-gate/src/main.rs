@@ -3,9 +3,10 @@ use io_gate::comm;
 use io_gate::config::Config;
 use io_gate::homeassistant::{self, discovery, HomeAssistant};
 use io_gate::message::{args::OutputState, Message};
-use tokio::time::Duration;
 use tracing::info;
-use tracing_subscriber::fmt;
+use tracing_subscriber::{EnvFilter, fmt};
+use tracing_subscriber::filter::LevelFilter;
+
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -47,16 +48,28 @@ fn init_log() {
         .with_timer(timer)
         .compact();
 
+    let filter = EnvFilter::builder()
+        .with_default_directive(LevelFilter::DEBUG.into())
+        .from_env().expect("RUST_LOG configuration is valid")
+        .add_directive("rumqttc=info".parse().unwrap());
+
     fmt()
         .event_format(format)
-        .with_max_level(tracing::Level::TRACE)
+        .with_env_filter(filter)
         .init();
 }
 
 /// Perform initial configuration and device discovery.
 async fn init_config(config: &Config, ha: &HomeAssistant) -> anyhow::Result<()> {
     for (device_name, cfg) in &config.devices {
-        let message = discovery::new_device(&device_name, &cfg);
+        let message = discovery::new_device(device_name, cfg);
+
+        // Subscribe to HomeAssistant state changes.
+        for component in message.components.values() {
+            ha.send(homeassistant::Outgoing::Subscribe(component.command_topic.clone())).await?;
+        }
+
+        // Send discovery message to register/update device in HA.
         ha.send(homeassistant::Outgoing::DiscoveryDevice(message))
             .await?;
     }
@@ -89,43 +102,56 @@ async fn main() -> anyhow::Result<()> {
 
     init_config(&config, &ha).await?;
 
-    let received = ha.recv().await;
-    info!("Got {:?}", received);
-
     let mut comm = comm::run(args.port_name, args.baud_rate).await?;
 
-    println!("Hello, world!");
+    info!("io-gate initialized.");
+
+    // USB -> MQTT
     tokio::spawn(async move {
         // TEMP: Receiver
         loop {
-            let msg = comm.rx.recv().await;
-            info!("USB RX. Buf: {:?}", &msg);
-            if let Some(msg) = msg {
-                let msg = Message::from_raw(msg);
-                info!("Parsed to {:?}", msg);
+            let msg = if let Some(msg) = comm.rx.recv().await {
+                msg
             } else {
+                // The other end died.
                 break;
-            }
-        }
-    });
-
-    tokio::spawn(async move {
-        // TEMP: Transmitter
-        loop {
-            tokio::time::sleep(Duration::from_secs(1)).await;
-
-            let msg = Message::SetOutput {
-                output: 5,
-                state: OutputState::Toggle,
             };
-            let addr = 2;
-            let raw = msg.to_raw(addr);
-            info!("Sending RAW message over USB {:?}", raw);
-            if comm.tx.send(raw).await.is_err() {
+            let msg = Message::from_raw(msg);
+            info!("CAN->RX: Message {:?}", msg);
+        }
+    });
+
+    // MQTT -> USB
+    tokio::spawn(async move {
+        loop {
+            let msg = if let Some(msg) = ha.recv().await {
+                msg
+            } else {
+                // The other side died.
                 break;
+            };
+
+            match msg {
+                homeassistant::Incoming::RawTest(_vec) => {
+                    info!("Raw test message received");
+                }
+                homeassistant::Incoming::SetOutput { device, output, on } => {
+                    let msg = Message::SetOutput {
+                        output,
+                        state: OutputState::from_bool(on),
+                    };
+                    let addr = device;
+                    let raw = msg.to_raw(addr);
+                    info!("Sending output change request over USB {:?}", raw);
+                    if comm.tx.send(raw).await.is_err() {
+                        break;
+                    }
+                },
             }
         }
     });
+
+    // TODO: Periodic time updates
 
     // Wait for tasks.
     let (reader_ret, writer_ret) = tokio::try_join!(comm.reader, comm.writer)?;
