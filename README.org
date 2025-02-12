@@ -1,7 +1,5 @@
 * Mono repository for all my smarthome needs.
-
 In progress. Gathering and growing my smarthome tools.
-
 
 ** IO Controller MainBoard
 
