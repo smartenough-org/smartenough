@@ -88,6 +88,7 @@
       </dia:composite>
     </dia:attribute>
   </dia:diagramdata>
+  <dia:layer name="Background" visible="true" connectable="false"/>
   <dia:layer name="Background" visible="true" connectable="true">
     <dia:object type="Flowchart - Box" version="0" id="O0">
       <dia:attribute name="obj_pos">
@@ -344,7 +345,7 @@
       <dia:attribute name="text">
         <dia:composite type="text">
           <dia:attribute name="string">
-            <dia:string>#io ctrl:
+            <dia:string>#io ctrl (addr 2):
 Kitchen,
 Dining Room,
 Living Room, #</dia:string>
@@ -395,7 +396,7 @@ Living Room, #</dia:string>
       <dia:attribute name="text">
         <dia:composite type="text">
           <dia:attribute name="string">
-            <dia:string>#io ctrl:
+            <dia:string>#io ctrl (addr 10):
 children rooms, bathroom#</dia:string>
           </dia:attribute>
           <dia:attribute name="font">
@@ -444,7 +445,7 @@ children rooms, bathroom#</dia:string>
       <dia:attribute name="text">
         <dia:composite type="text">
           <dia:attribute name="string">
-            <dia:string>#io ctrl:
+            <dia:string>#io ctrl (addr 11):
 master bedroom,
 guest room, laundry room#</dia:string>
           </dia:attribute>
@@ -641,7 +642,7 @@ guest room, laundry room#</dia:string>
       <dia:attribute name="text">
         <dia:composite type="text">
           <dia:attribute name="string">
-            <dia:string>#io ctrl:
+            <dia:string>#io ctrl (addr 1):
 Entrance, garage,
 office, bathroom#</dia:string>
           </dia:attribute>
@@ -1123,7 +1124,7 @@ HomeAssistant
         <dia:point val="21.8863,16.5"/>
       </dia:attribute>
       <dia:attribute name="obj_bb">
-        <dia:rectangle val="21.5614,16.4495;22.2248,18.0505"/>
+        <dia:rectangle val="21.5615,16.4495;22.2248,18.0505"/>
       </dia:attribute>
       <dia:attribute name="conn_endpoints">
         <dia:point val="21.8863,16.5"/>
@@ -1190,13 +1191,13 @@ HomeAssistant
     </dia:object>
     <dia:object type="Standard - Line" version="0" id="O24">
       <dia:attribute name="obj_pos">
-        <dia:point val="21.8522,11.3"/>
+        <dia:point val="21.8523,11.3"/>
       </dia:attribute>
       <dia:attribute name="obj_bb">
-        <dia:rectangle val="21.5346,11.249;22.2039,13.051"/>
+        <dia:rectangle val="21.5347,11.249;22.2039,13.051"/>
       </dia:attribute>
       <dia:attribute name="conn_endpoints">
-        <dia:point val="21.8522,11.3"/>
+        <dia:point val="21.8523,11.3"/>
         <dia:point val="21.8863,13"/>
       </dia:attribute>
       <dia:attribute name="numcp">
@@ -1584,7 +1585,7 @@ Power supply
       <dia:attribute name="text">
         <dia:composite type="text">
           <dia:attribute name="string">
-            <dia:string>#io ctrl:
+            <dia:string>#io ctrl (addr 3):
 Drapes
 and some
 other stuff#</dia:string>
@@ -1711,7 +1712,7 @@ other stuff#</dia:string>
         <dia:point val="24,23.5"/>
       </dia:attribute>
       <dia:attribute name="obj_bb">
-        <dia:rectangle val="24,22.7931;24.9844,23.7338"/>
+        <dia:rectangle val="24,22.815;24.9625,23.69"/>
       </dia:attribute>
       <dia:attribute name="text">
         <dia:composite type="text">
@@ -2461,7 +2462,7 @@ other stuff#</dia:string>
         <dia:point val="47.225,17.0125"/>
       </dia:attribute>
       <dia:attribute name="obj_bb">
-        <dia:rectangle val="47.1244,16.5441;58.3504,17.4197"/>
+        <dia:rectangle val="47.1244,16.5441;58.3505,17.4197"/>
       </dia:attribute>
       <dia:attribute name="conn_endpoints">
         <dia:point val="47.225,17.0125"/>
@@ -2665,7 +2666,7 @@ other stuff#</dia:string>
         <dia:point val="57,6.5"/>
       </dia:attribute>
       <dia:attribute name="obj_bb">
-        <dia:rectangle val="57,5.79313;64.0769,6.73375"/>
+        <dia:rectangle val="57,5.815;64.055,6.69"/>
       </dia:attribute>
       <dia:attribute name="text">
         <dia:composite type="text">
@@ -2878,7 +2879,7 @@ other stuff#</dia:string>
         <dia:point val="47,24"/>
       </dia:attribute>
       <dia:attribute name="obj_bb">
-        <dia:rectangle val="47,23.2931;57.2969,24.2338"/>
+        <dia:rectangle val="47,23.315;57.275,24.19"/>
       </dia:attribute>
       <dia:attribute name="text">
         <dia:composite type="text">
@@ -2960,7 +2961,7 @@ with relays close by.#</dia:string>
         <dia:point val="41,23"/>
       </dia:attribute>
       <dia:attribute name="obj_bb">
-        <dia:rectangle val="41,22.2931;43.4294,23.2338"/>
+        <dia:rectangle val="41,22.315;43.4075,23.19"/>
       </dia:attribute>
       <dia:attribute name="text">
         <dia:composite type="text">

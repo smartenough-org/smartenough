@@ -56,6 +56,7 @@ should be a bus. Hence in one case I send CAN signal back over another cable
 pair in the same cable to "flatten" it out. Bus gets longer (it's around 50m
 total), but stubs are shorter.
 
+*** Connecting cables
 I use two pairs for power, one for CAN and one for optional CAN return and a bit
 weird RJ45 wiring to indicate the cable is a "SMART" cable not Ethernet. I also
 mark those in a visible way. Anything will work as long as CAN and FORWARD is in
@@ -72,6 +73,53 @@ the same twisted pair (my mapping will work with normal T568B too).
 | w-br  | w-br | 7 | CAN_L FORWARD         |
 | br    | br   | 8 | CAN_H FORWARD         |
 
+*** CAN configuration
+I use CAN because it's a multi-master bus, no "leader" device on the BUS needs
+to poll for data from "following" devices. When input event occurs or output
+changes state a board broadcasts a message on the bus. Another board can see
+this message and react by changing it's outputs.
+
+Gate is a special device that serves as a bidirectional =CAN<->USB<->MQTT=
+bridge. It receives CAN messages, converts them and publishes them on MQTT. It
+also subscribes to MQTT topics and if something is published there it sends a
+CAN request to for example toggle an Output.
+
+I use 250kbps CAN speed and 11-bit addressing. I opted for a simple CAN protocol
+(as opposed to more versatile CANopen). Address relates to a "message" more than
+a "sender/receiver" and is used in determining the priority on the bus. Given
+that:
+- Messages must be properly unique,
+- lower values have higher priorities,
+- we want at least 64 devices on the bus,
+I picked 6 bit for device address and 5 for message type (32 different message
+types). Format: =TTTTTAAAAAA (T)ype + (A)ddress=.
+
+Reporting errors, propagating output/input changes, setting output has higher
+priority than requesting status, reporting status, time announcements or some
+debug ping/pong messages.
+
+Message body consists of up to 8 bytes of data, system typically uses 2-3.
+Example: Request output change has 2 bytes: Index of output to change and byte
+representing state (Off, On, Toggle). Message address points at the device that
+should change output ("destination").
+
+Message "Output changed" has similarly output index and state (Off, On), but
+address points to a message source instead. I don't use RTR (remote frames).
+
+Conscise list of used commands (but see message.rs for details):
+- ERROR 0x02 - Error happened.
+- OUTPUT_CHANGED 0x04 - My output changed
+- INPUT_CHANGED 0x05 -  My input was changed
+- SET_OUTPUT 0x08 - Set output X to Y (or invert state)
+- CALL_PROC 0x0A - Call a predefined procedure in VM
+- CALL_SHUTTER 0x0B - Pass command to Shutter code
+- STATUS_IO 0x0E - My current IO status, not necessarily changed.
+- INFO 0x12 - Similar to ERROR, but low priority (eg. Device started)
+- PONG 0x1D
+- PING 0x1E
+
+Call Shutter is longest command as it includes a shutter index and a command
+byte that can contain a height and a tilt of the shutter.
 
 ** IO Controller MainBoard
 For details on components and software see
