@@ -1,0 +1,5 @@
+io-ctrl
+io-gate
+hardware/*/*-backups
+hardware/*/export
+hardware/*/*-bak
