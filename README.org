@@ -1,26 +1,98 @@
-* Mono repository for all my smarthome needs.
-In progress. Gathering and growing my smarthome tools.
+* SmartEnough
+SmartEnough is an open source smart home solution that combines affordable
+off-the-shelf hardware with a robust software architecture. Built for people
+that don't want to pay premium for each IO they add to the system, who want to
+trust the system's reliability and who are not afraid of some tinkering.
+
+** SmartEnough design goals
+- Extra cheap hardware: doable by hand (soldering iron or breadboard) and
+  upgradable to something more sturdy with ordered PCBs. 48+ IO per single board
+  possible and way cheaper $/IO than in any available commercial solutions.
+- Robust, resiliant, secure: communication and power over twisted pair cables -
+  no batteries, no radio, no cloud.
+- Supports house wiring in "constellation of star topologies". We don't have a
+  device in each light switch or socket, but neither are we limited to a single
+  central control point. Cables from lights/shutters and switches should meet
+  somewhere in one or more electrical boxes that are connected together with a
+  twisted pair cable to form a CAN bus. Bus can span multiple devices in single
+  electrical box, or connect multiple points in a bus or semi-bus configuration.
+- Instant response to input.
+- Event on one board can cause an action on another (eg. stair switches) via a
+  bus without requiring a computer and HomeAssistant - eg. stair lighting.
+- Can gather door/window/movement sensor data and be used as an alarm system.
+- Open & customizable: I'm building it to suit my needs, trying to keep it open
+  for any additional sensible functions.
+- Integrates with HomeAssistant, but can do a lot without it.
+
+** Resources
+The core system software is in two repositories:
+- [[https://github.com/smartenough-org/io-ctrl][io-ctrl]]:
+  Firmware for IO controller board that handles IO - reads switches and
+  sensors, changes outputs. Contains also firmware for hardware part (left side)
+  of =CAN<->USB<->MQTT= bridge to talk to HomeAssistant.
+- [[https://github.com/smartenough-org/io-gate][io-gate]]:
+  computer part of =CAN<->USB<->MQT= bridge (right part) to convert CAN
+  messages to MQTT events that can be understood by HomeAssistant.
+- Firmware is in Rust, written with Embassy framework for STM32G431 device.
+  Should migrate easy enough to other chips assuming enough peripherals are
+  available (CAN and USB working together, 128kB+ Flash, 32kB+ RAM).
+
+Rest of the resources include:
+- KiCAD (schematic + board) designs for IO controller board (can be used for
+  gate as well).
+- KiCAD for organized power injection with protection.
+- KiCAD for additional ESPHOME boards for less critical components (like
+  temperature sensors).
+- 3D printing (FreeCad) designs for DIN rail (mount in electrical boxes) and
+  other project boxes for boards (OpenSCAD).
+- This repository in addition can contain anything smarthome related I might
+  publish (eg. some micropython watering experiments)
+
+** Example deployment
+[[media/deployment-diagram.png]]
+
+That's my currently working deployment. NOTE: CAN should not be a star, it
+should be a bus. Hence in one case I send CAN signal back over another cable
+pair in the same cable to "flatten" it out. Bus gets longer (it's around 50m
+total), but stubs are shorter.
+
+I use two pairs for power, one for CAN and one for optional CAN return and a bit
+weird RJ45 wiring to indicate the cable is a "SMART" cable not Ethernet. I also
+mark those in a visible way. Anything will work as long as CAN and FORWARD is in
+the same twisted pair (my mapping will work with normal T568B too).
+
+| T568B | CAN  |   |                       |
+|-------+------+---+-----------------------|
+| w-o   | w-o  | 1 | CAN_L                 |
+| o     | o    | 2 | CAN_H                 |
+| w-g   | w-g  | 3 | IN POWER, 24V         |
+| bl    | g    | 4 | IN POWER, GND (swap!) |
+| w-bl  | w-bl | 5 | IN POWER, 24V         |
+| g     | bl   | 6 | IN POWER, GND (swap!) |
+| w-br  | w-br | 7 | CAN_L FORWARD         |
+| br    | br   | 8 | CAN_H FORWARD         |
+
 
 ** IO Controller MainBoard
+For details on components and software see
+[[https://github.com/smartenough-org/io-ctrl][io-ctrl]].
 
-- Cheap!
-- Easy for DIY, even on a breadboard or soldered with wires.
-- Uses available ready modules so there's not much to solder yourself.
-- Assumes a distributed (using CAN), resiliant architecture.
-- Based on STM32G431 WeAct module. Could be migrated to use other - eg. stm32f4.
-- Has rudimentary (and optional) ESD protection using esda6v1s3.
+This board controls IOs when paired with some relay/SSR module. It sits in an
+electrical box where it can read signals from light switches and control power
+to lighting. It's talks with the world via classical twisted pair cable: CAT5e
+UTP. Cable carries power (24V+) and a CAN bus.
 
 [[hardware/board_v1.png]]
 [[hardware/schematic_v1.png]]
 
-*** Components:
-- [https://github.com/WeActStudio/WeActStudio.STM32G431CoreBoard.git]
-- CAN module, TJA1050 based.
-- RS485 module, HW0519.
-- Optional PCF8575 IO expanders (1-3)
-- LM2596 stabilizer (30V+ -> 12V)
-- MP1584 stabilizer (12V -> 5V)
+** Power distribution board
+Power board distributes power with some protection (capacitors, resettable
+individual fuses, main fuses, zener diodes to limit voltage, diodes to prevent
+invalid polarization). It also connects CAN BUS together in configured various
+ways (directly, or using FORWARD pair). In general it allows me to connect the
+cables from boards in the main central hub easily.
 
+[[hardware/powerboard_v1.png]]
 
 ** Greenfinger
 
