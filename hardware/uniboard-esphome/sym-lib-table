@@ -1,0 +1,5 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "s2")(type "KiCad")(uri "/home/bla/_jails/dev/_smarthome/smartenough/hardware/esphome-uni-board/uniboard/s2mini.pretty/RF_Module.kicad_sym")(options "")(descr ""))
+  (lib (name "io-board-mods")(type "KiCad")(uri "/home/bla/_jails/dev/_smarthome/smartenough/hardware/io-board/mod2_symbols.kicad_sym")(options "")(descr ""))
+)

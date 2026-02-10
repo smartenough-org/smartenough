@@ -94,6 +94,18 @@ cables from boards in the main central hub easily.
 
 [[hardware/powerboard_v1.png]]
 
+** ESPHome "Uniboard"
+It's not strictly part of my main smarthome. A universal PCB board for ESP32 S2
+Mini modules I have. It has power stabilization, 1-wire pull-up, some analog
+inputs, RS485 interface, four MOSFETs for RGBW or anything else (garage door
+control).
+
+I use it with Esphome (over Wifi) where I can't reach with my CAN bus, or where
+I don't need the resiliency or just temporarily. For example to gather
+temperature readings around heat pump.
+
+[[hardware/uniboard.png]]
+
 ** Greenfinger
 
 Automatic plant watering using ESP8266 (or ESP32) using Micropython.
